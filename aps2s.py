@@ -3,6 +3,7 @@ import argparse
 import inspect
 import logging
 from pathlib import Path
+from docstring_parser import parse_from_object
 
 import xarray as xr 
 import xesmf as xe
@@ -46,30 +47,31 @@ class AutoCLI(object):
             choices=[
                 "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL",
             ],
-            help="Set the logging level"
+            help=argparse.SUPPRESS
         )
 
         # Specifies whether or not the return value of the executed function should be printed
         self.parser.add_argument(
             "--return-output", dest="return_output", action='store_true',
-            help="Print the returned value of the executed function"
+            help=argparse.SUPPRESS
         )
 
         # Allow logging to a file instead of to the console
         self.parser.add_argument(
             "--log-file", dest="log_file", metavar="LOGFILE",
-            help="Write logs to a file instead of to the console"
+            help=argparse.SUPPRESS
         )
 
-        # Customize help message (replace "positional arguments header")
-        self.parser._positionals.title = "Subcommands"
+        # # Customize help message (replace "positional arguments header")
+        self.parser._positionals.title = "Available sub-commands"
+        # self.parser._positionals.title = ""
 
         # Add support for subparsers (customize layout using metavar)
         self.subparsers = self.parser.add_subparsers(
-            help="Description",
+            # help="Description",
             dest="subcommand_name",
-            metavar="<command>",
-            required=True,
+            metavar="<sub-command>",
+            # required=True,
         )
 
     def run(self):
@@ -115,6 +117,8 @@ class AutoCLI(object):
             if key in argspec.parameters
         }
 
+        print(args.log_level, args.log_file)        
+
         # Log some output
         self.logger.debug("Executing function: %s" % self.commands[subcommand_name])
 
@@ -125,17 +129,28 @@ class AutoCLI(object):
         if args.return_output:
             print(return_value.__repr__())
 
-    def register_command(self, _function):
-        """A function to register a function as cli command 
+    def register_command(self, _function, name=None):
+        """
+        Register a function as cli command 
         """
         # Make sure _function is a function 
         assert(inspect.isfunction(_function))
 
         # Get command name and convert underscores to hyphens/dashes
         command_name = _function.__name__
+        if name:
+            command_name=name
 
         # Get the help message from the doc-string if the doc-string exists
         help_string = inspect.getdoc(_function)
+
+        docstring = parse_from_object(_function)
+
+        help_string = docstring.short_description
+        description = f'{docstring.short_description} \n {docstring.long_description}'
+
+        params_description = { params.arg_name: params.description for params in docstring.params }
+
         if not help_string:
             help_string = ""
 
@@ -143,7 +158,8 @@ class AutoCLI(object):
         subparser = self.subparsers.add_parser(
             command_name,
             help=help_string,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            description=description,
+            formatter_class=argparse.RawDescriptionHelpFormatter
         )
 
         argspec = inspect.signature(_function)
@@ -157,17 +173,31 @@ class AutoCLI(object):
             arg_type = parameter.annotation if parameter.annotation is not parameter.empty else None
             default = None
             parameter_name = parameter.name
+            metavar = f'<{parameter.name}>'
             if parameter.default is not parameter.empty:
                 parameter_name = '--'+parameter.name
                 default = parameter.default
+            parameter_help = ' '
+            if parameter.name in params_description:
+                parameter_help = params_description[parameter.name]
+            if default:
+                parameter_help += f' (default: {default})'
 
-            subparser.add_argument(parameter_name, default=default, help=' ', type=arg_type)
+            # print(parameter_name, parameter_help, default)
+
+            subparser.add_argument(
+                parameter_name, 
+                default=default, 
+                help=parameter_help,
+                metavar=metavar,
+                type=arg_type,
+                )
 
         # Register the function with the CLI
         self.commands[command_name] = _function
 
 
-def plot_bathy(lat, lon, z):
+def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     ax = plt.axes(projection=ccrs.PlateCarree())
     levels = list(np.linspace(-3000,-200,10))[:-1] + list(np.linspace(-200,0,21))
     levels = [ -0.0000001 if item == 0.0 else item for item in levels ]
@@ -182,11 +212,23 @@ def plot_bathy(lat, lon, z):
 
     plt.colorbar(cs)
 
-    plt.savefig('bathymetry.png')
+    plt.savefig(filepath)
 
 
-def make_bathy(wrf_geo:str,input_bathy:str):
-    """Create bathymetry file for MITGCM"""
+def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry'):
+    """
+    Create bathymetry file for MITGCM
+
+    The coordinate information required for creating bathymetry can be given in following ways:
+        1) Coordinates taken from the WRF geo_em file. 
+           This will also create the relevant MITgcm namelist fields.
+        2) Coordinates taken from MITgcm namelist. (Not Implemented)
+
+    Args:
+        wrf_geo (str): Path to WRF geo_em file.
+        input_bathy (str) : Path to the input bathymetry file.
+        out_file (str) : Path of output bathymetry.
+    """
 
     ds_geo = xr.open_dataset(wrf_geo)
     ds_input_bathy = xr.open_dataset(input_bathy)
@@ -208,14 +250,21 @@ def make_bathy(wrf_geo:str,input_bathy:str):
 
     dr_out = regridder(input_bathy, keep_attrs=True)
 
-    dr_out.to_netcdf('test.nc')
+    dr_out.to_netcdf(f'{out_file}.nc')
 
-    plot_bathy(XLAT_M, XLONG_M, dr_out)
+    plot_bathy(XLAT_M, XLONG_M, dr_out, filepath=f'{out_file}.png')
 
+def get_cli():
+    cli = AutoCLI()
+    cli.register_command(make_bathy, name='create_bathymetry')
+    return cli
+
+def get_cli_parser():
+    cli = get_cli()
+    return cli.parser
 
 if __name__=="__main__":
-    cli = AutoCLI()
-    cli.register_command(make_bathy)
+    cli = get_cli()
     cli.run()
 
 

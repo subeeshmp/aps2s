@@ -11,3 +11,5 @@ dependencies:
   - netcdf4
   - pip:
       - "f90nml"
+      - "docstring_parser"
+      - "sphinx"
