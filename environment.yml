@@ -1,0 +1,13 @@
+name: aps2s
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - xesmf=0.7.0
+  - xarray
+  - matplotlib
+  - cartopy
+  - numpy
+  - netcdf4
+  - pip:
+      - "f90nml"
