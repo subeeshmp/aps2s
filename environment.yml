@@ -9,7 +9,7 @@ dependencies:
   - cartopy
   - numpy
   - netcdf4
+  - pip 
   - pip:
       - "f90nml"
       - "docstring_parser"
-      - "sphinx"

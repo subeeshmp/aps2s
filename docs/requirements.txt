@@ -1,0 +1,5 @@
+furo
+Sphinx
+git+https://github.com/prajeeshag/sphinx-argparse@mock_imports#egg=sphinx-argparse
+sphinx-copybutton
+docstring_parser
