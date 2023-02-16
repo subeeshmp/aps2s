@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 import argparse
 import inspect
@@ -5,7 +6,7 @@ import logging
 from pathlib import Path
 from docstring_parser import parse_from_object
 
-from utils import make_bathy
+from utils import make_bathy, plot_bathymetry
 
 
 class AutoCLI(object):
@@ -191,6 +192,7 @@ class AutoCLI(object):
 def get_cli():
     cli = AutoCLI()
     cli.register_command(make_bathy, name='create_bathymetry')
+    cli.register_command(plot_bathymetry)
     return cli
 
 def get_cli_parser():

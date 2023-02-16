@@ -20,7 +20,7 @@ def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     cmap=plt.cm.jet
     norm = mcolors.BoundaryNorm(boundaries=levels, ncolors=cmap.N)
 
-    cs=ax.contourf(lon,lat,z,levels=levels,cmap=cmap,norm=norm,transform=ccrs.PlateCarree(),extend='max')
+    cs=ax.contourf(lon,lat,z,levels=levels,cmap=cmap,norm=norm,transform=ccrs.PlateCarree(),extend='min')
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linestyle='--')
     gl.top_labels = False
     gl.right_labels = False
@@ -30,9 +30,25 @@ def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     plt.savefig(filepath)
 
 
-def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry'):
+def plot_bathymetry(ncfile:str, out_file:str='bathymetry'):
+    """ 
+    Plot the bathymetry of MITgcm
+
+    Args:
+        ncfile (str): Path of bathymetry NetCdf file
+        out_file (str) : Path of output file.
     """
-    Create bathymetry file for MITGCM
+    ds = xr.open_dataset(ncfile)
+    z = ds['z']
+    lat = z['lat']
+    lon = z['lon']
+
+    plot_bathy(lat, lon, z, filepath=out_file)
+
+
+def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='bathymetry'):
+    """
+    Create bathymetry file for MITgcm
 
     The coordinate information required for creating bathymetry can be given in following ways:
         1) Coordinates taken from the WRF geo_em file. 
