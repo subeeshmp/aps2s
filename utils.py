@@ -30,7 +30,7 @@ def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     plt.savefig(filepath)
 
 
-def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry'):
+def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry',z_name:str='z'):
     """
     Create bathymetry file for MITGCM
 
@@ -43,11 +43,12 @@ def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry'):
         wrf_geo (str): Path to WRF geo_em file.
         input_bathy (str) : Path to the input bathymetry file.
         out_file (str) : Path of output bathymetry.
+        z_name (str):  Variable name in input bathymetry
     """
 
     ds_geo = xr.open_dataset(wrf_geo)
     ds_input_bathy = xr.open_dataset(input_bathy)
-    input_bathy = ds_input_bathy['z']
+    input_bathy = ds_input_bathy[z_name]
 
     XLAT_M = ds_geo['XLAT_M'][0,:,0]
     XLONG_M = ds_geo['XLONG_M'][0,0,:]
