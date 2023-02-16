@@ -1,4 +1,5 @@
 
+import math
 from pathlib import Path
 
 import f90nml
@@ -7,10 +8,14 @@ import xesmf as xe
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backend_bases import MouseButton
+import matplotlib.colors as mcolors
+
 import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import matplotlib.colors as mcolors
-# import something
+
+from mpl_interactions import ioff, panhandler, zoom_factory
+
 
 def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     ax = plt.axes(projection=ccrs.PlateCarree())
@@ -86,3 +91,37 @@ def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='bathymetry'):
     plot_bathy(XLAT_M, XLONG_M, dr_out, filepath=f'{out_file}.png')
 
 
+
+def on_pick(event):
+    mouseevent = event.mouseevent
+    if mouseevent.button is not MouseButton.LEFT:
+        return
+    artist = event.artist
+
+    print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
+          ('double' if mouseevent.dblclick else 'single', mouseevent.button,
+           mouseevent.x, mouseevent.y, mouseevent.xdata, mouseevent.ydata))
+    _gx = int(math.floor(mouseevent.xdata))
+    _gy = int(math.floor(mouseevent.ydata))
+    zz = artist.get_array()
+    dims = [i-1 for i in artist.get_coordinates().shape[:2]]
+    ind = _gy*dims[1] + _gx
+    zz[ind] = 25
+    artist.set_array(zz)
+    artist.get_figure().canvas.draw()
+
+
+
+if __name__ == '__main__':
+    Z = xr.open_dataset('Bathymetry.nc')['z']
+    Z = Z.values
+    with ioff:
+        fig, ax = plt.subplots()
+
+    # mesh = ax.pcolormesh(Z, edgecolor='k', cmap='plasma', vmin=0, vmax=25, picker=True)
+    mesh = ax.pcolormesh(Z, cmap='plasma', vmin=0, vmax=25, picker=True)
+    fig.canvas.mpl_connect('pick_event', on_pick)
+    plt.title('matplotlib.pyplot.pcolormesh() function Example', fontweight="bold")
+    disconnect_zoom = zoom_factory(ax)
+    pan_handler = panhandler(fig,button=2)
+    plt.show()
