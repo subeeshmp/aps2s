@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import matplotlib.colors as mcolors
+from matplotlib.colors import BoundaryNorm
 
 import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
@@ -115,13 +116,19 @@ def on_pick(event):
 if __name__ == '__main__':
     Z = xr.open_dataset('Bathymetry.nc')['z']
     Z = Z.values
-    with ioff:
+    Z[Z>=0] = 100
+    with plt.ioff():
         fig, ax = plt.subplots()
-
-    # mesh = ax.pcolormesh(Z, edgecolor='k', cmap='plasma', vmin=0, vmax=25, picker=True)
-    mesh = ax.pcolormesh(Z, cmap='plasma', vmin=0, vmax=25, picker=True)
+    
+    cmap = plt.colormaps['jet']
+    cmap.set_over('white')
+    levels = np.linspace(-1000,0,10)
+    norm = BoundaryNorm(levels, ncolors=cmap.N)
+    mesh = ax.pcolormesh(Z, cmap=cmap, norm=norm, picker=True)
     fig.canvas.mpl_connect('pick_event', on_pick)
-    plt.title('matplotlib.pyplot.pcolormesh() function Example', fontweight="bold")
+    # plt.title('matplotlib.pyplot.pcolormesh() function Example', fontweight="bold")
+
+    plt.colorbar(mesh)
     disconnect_zoom = zoom_factory(ax)
     pan_handler = panhandler(fig,button=2)
     plt.show()
