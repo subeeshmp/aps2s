@@ -1,4 +1,5 @@
 
+import math
 from pathlib import Path
 
 import f90nml
@@ -7,10 +8,15 @@ import xesmf as xe
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backend_bases import MouseButton
+import matplotlib.colors as mcolors
+from matplotlib.colors import BoundaryNorm
+
 import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import matplotlib.colors as mcolors
-# import something
+
+from mpl_interactions import ioff, panhandler, zoom_factory
+
 
 def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     ax = plt.axes(projection=ccrs.PlateCarree())
@@ -20,7 +26,7 @@ def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     cmap=plt.cm.jet
     norm = mcolors.BoundaryNorm(boundaries=levels, ncolors=cmap.N)
 
-    cs=ax.contourf(lon,lat,z,levels=levels,cmap=cmap,norm=norm,transform=ccrs.PlateCarree(),extend='max')
+    cs=ax.contourf(lon,lat,z,levels=levels,cmap=cmap,norm=norm,transform=ccrs.PlateCarree(),extend='min')
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linestyle='--')
     gl.top_labels = False
     gl.right_labels = False
@@ -30,9 +36,27 @@ def plot_bathy(lat, lon, z, filepath='bathymetry.png'):
     plt.savefig(filepath)
 
 
-def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry',z_name:str='z'):
+
+def plot_bathymetry(ncfile:str, out_file:str='bathymetry'):
+    """ 
+    Plot the bathymetry of MITgcm
+
+    Args:
+        ncfile (str): Path of bathymetry NetCdf file
+        out_file (str) : Path of output file.
     """
-    Create bathymetry file for MITGCM
+    ds = xr.open_dataset(ncfile)
+    z = ds['z']
+    lat = z['lat']
+    lon = z['lon']
+
+    plot_bathy(lat, lon, z, filepath=out_file)
+
+
+def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry',z_name:str='z'):
+
+    """
+    Create bathymetry file for MITgcm
 
     The coordinate information required for creating bathymetry can be given in following ways:
         1) Coordinates taken from the WRF geo_em file. 
@@ -71,3 +95,43 @@ def make_bathy(input_bathy:str,wrf_geo:str,out_file:str='Bathymetry',z_name:str=
     plot_bathy(XLAT_M, XLONG_M, dr_out, filepath=f'{out_file}.png')
 
 
+
+def on_pick(event):
+    mouseevent = event.mouseevent
+    if mouseevent.button is not MouseButton.LEFT:
+        return
+    artist = event.artist
+
+    print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
+          ('double' if mouseevent.dblclick else 'single', mouseevent.button,
+           mouseevent.x, mouseevent.y, mouseevent.xdata, mouseevent.ydata))
+    _gx = int(math.floor(mouseevent.xdata))
+    _gy = int(math.floor(mouseevent.ydata))
+    zz = artist.get_array()
+    dims = [i-1 for i in artist.get_coordinates().shape[:2]]
+    ind = _gy*dims[1] + _gx
+    zz[ind] = 25
+    artist.set_array(zz)
+    artist.get_figure().canvas.draw()
+
+
+
+if __name__ == '__main__':
+    Z = xr.open_dataset('Bathymetry.nc')['z']
+    Z = Z.values
+    Z[Z>=0] = 100
+    with plt.ioff():
+        fig, ax = plt.subplots()
+    
+    cmap = plt.colormaps['jet']
+    cmap.set_over('white')
+    levels = np.linspace(-1000,0,10)
+    norm = BoundaryNorm(levels, ncolors=cmap.N)
+    mesh = ax.pcolormesh(Z, cmap=cmap, norm=norm, picker=True)
+    fig.canvas.mpl_connect('pick_event', on_pick)
+    # plt.title('matplotlib.pyplot.pcolormesh() function Example', fontweight="bold")
+
+    plt.colorbar(mesh)
+    disconnect_zoom = zoom_factory(ax)
+    pan_handler = panhandler(fig,button=2)
+    plt.show()
